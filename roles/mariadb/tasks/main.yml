@@ -1,0 +1,111 @@
+---
+- name: Lookup mariadb root password
+  community.kubernetes.k8s_info:
+    kind: Secret
+    name: '{{ansible_operator_meta.name}}-rootpw'
+    namespace: '{{ansible_operator_meta.namespace}}'
+  register: rootpw_secret
+
+- name: Setup mariadb root password
+  community.kubernetes.k8s:
+    state: present
+    validate:
+      fail_on_error: yes
+      strict: yes
+    wait: yes
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: Opaque
+      metadata:
+        name: '{{ansible_operator_meta.name}}-rootpw'
+        namespace: '{{ansible_operator_meta.namespace}}'
+        labels:
+          app.kubernetes.io/name: mariadb
+          app.kubernetes.io/component: primary
+          app.kubernetes.io/instance: '{{ansible_operator_meta.name}}'
+      stringData:
+        password: '{{lookup("password", "/dev/null length=21")}}'
+  when: rootpw_secret.resources|length == 0
+
+- name: Setup MariaDB service
+  community.kubernetes.k8s:
+    definition:
+      kind: Service
+      apiVersion: v1
+      metadata:
+        name: '{{ansible_operator_meta.name}}'
+        namespace: '{{ansible_operator_meta.namespace}}'
+        labels:
+          app.kubernetes.io/name: mariadb
+          app.kubernetes.io/component: primary
+          app.kubernetes.io/instance: '{{ansible_operator_meta.name}}'
+      spec:
+        sessionAffinity: '{{sessionAffinity|default("None")}}'
+        type: '{{serviceType|default("ClusterIP")}}'
+        clusterIP: '{{clusterIP|default("None")}}'
+        loadBalancerClass: '{{loadBalancerClass|default(omit)}}'
+        loadBalancerIP: '{{loadBalancerIP|default(omit)}}'
+        ports:
+        - port: 3306
+          name: mysql
+          nodePort: '{{nodePort|default(omit)}}'
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: mariadb
+            app.kubernetes.io/component: primary
+            app.kubernetes.io/instance: '{{ansible_operator_meta.name}}'
+
+- name: Setup MariaDB servers
+  community.kubernetes.k8s:
+    definition:
+      kind: StatefulSet
+      apiVersion: apps/v1
+      metadata:
+        name: '{{ansible_operator_meta.name}}'
+        namespace: '{{ansible_operator_meta.namespace}}'
+        labels:
+          app.kubernetes.io/name: mariadb
+          app.kubernetes.io/component: primary
+          app.kubernetes.io/instance: '{{ansible_operator_meta.name}}'
+      spec:
+        replicas: 1
+        serviceName: '{{ansible_operator_meta.name}}'
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: mariadb
+            app.kubernetes.io/component: primary
+            app.kubernetes.io/instance: '{{ansible_operator_meta.name}}'
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: mariadb
+              app.kubernetes.io/component: primary
+              app.kubernetes.io/instance: '{{ansible_operator_meta.name}}'
+          spec:
+            containers:
+            - name: mariadb
+              image: '{{image.repository|default("bitnami/mariadb")}}:{{image.tag|default("latest")}}'
+              #command:
+              #args:
+              env:
+              - name: MARIADB_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: '{{ ansible_operator_meta.name }}-rootpw'
+                    key: password
+              ports:
+              - containerPort: 3306
+        volumeClaimTemplates:
+        - metadata:
+            name: data
+            labels:
+              app.kubernetes.io/name: mariadb
+              app.kubernetes.io/component: primary
+              app.kubernetes.io/instance: '{{ansible_operator_meta.name}}'
+          spec:
+            accessModes: '{{accessModes}}'
+            storageClassName: '{{storageClass|default(omit)}}'
+            resources:
+              requests:
+                storage: '{{volumeSize}}'

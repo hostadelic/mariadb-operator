@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+
+from os.path import basename, dirname, join, realpath
+import re
+from sys import argv, exit
+
+
+scripts_path   = dirname(realpath(__file__))
+repo_path      = dirname(scripts_path)
+
+
+COMPONENTS = ('major', 'minor', 'revision')
+
+
+def usage(code=0, message=None):
+    if message:
+        print(message, '\n')
+    print(f'''Usage : {basename(__file__)} [COMPONENT] [OPERATION]
+
+    COMPONENT   Version component to act upon in {COMPONENTS}
+                Defaults to revision
+    OPERATION   Operation to do on the component expressed as concatenating
+                an OPERATOR and an OPERAND (a positive integer)
+                Defaults to `+1'
+                Available operators: `+', `-' and `=' ''')
+    exit(code)
+
+
+def main(args):
+    if len(args) > 2:
+        usage()
+
+    operator = '+'
+    value = 1
+    component = 'revision'
+    version_string = None
+    
+    for arg in args:
+        if arg in COMPONENTS:
+            component = arg
+        elif arg[0] in ('-', '+', '='):
+            operator = arg[0]
+            try:
+                value = int(arg[1:])
+                if value < 0:
+                    usage(1, 'Invalid argument `' + arg + '\'')
+            except:
+                usage(1, 'Invalid argument `' + arg + '\'')
+        else:
+            usage(1, 'Invalid argument `' + arg + '\'')
+    
+    with open(join(repo_path, 'Makefile'), 'r') as handle:
+        content = list(handle)
+        for ln, line in enumerate(content):
+            match = re.fullmatch(
+                r'VERSION\s*\S*=\S*\s*([\S]*)\s*',
+                line,
+                re.ASCII
+            )
+            if match:
+                version_string = match.group(1)
+                break
+
+    if not version_string:
+        ln = -1
+        version_string = '0.0.0'
+
+    version = list(map(int, version_string.split('.')))
+    if operator == '=':
+        version[COMPONENTS.index(component)] = value
+    elif operator == '+':
+        version[COMPONENTS.index(component)] += value
+    elif operator == '-':
+        version[COMPONENTS.index(component)] -= value
+    else:
+        usage(2, 'Invalid operator `' + operator + '\'')
+
+    version_string = '.'.join(map(str, version))
+    if ln == -1:
+        content.insert(0, 'VERSION ?= ' + version_string + '\n')
+    else:
+        content[ln] = 'VERSION ?= ' + version_string + '\n'
+
+    with open(join(repo_path, 'Makefile'), 'w') as handle:
+        handle.write(''.join(content))
+
+
+if __name__ == '__main__':
+    main(argv[1:])

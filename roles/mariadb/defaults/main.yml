@@ -1,0 +1,9 @@
+---
+sessionAffinity: None
+serviceType: ClusterIP
+clusterIP: None
+#nodePort: omit
+#loadBalancerClass: omit
+#loadBalancerIP: omit
+accessModes: ["ReadWriteOnce"]
+volumeSize: 10Gi

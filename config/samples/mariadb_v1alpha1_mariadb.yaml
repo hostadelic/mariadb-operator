@@ -1,0 +1,6 @@
+apiVersion: mariadb.hostadelic.com/v1alpha1
+kind: Mariadb
+metadata:
+  name: mariadb-sample
+spec:
+  volumeSize: 2Gi

@@ -1,0 +1,2 @@
+kubernetes-validate>=1.20.0
+docker-py

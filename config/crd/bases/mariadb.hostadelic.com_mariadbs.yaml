@@ -1,0 +1,106 @@
+---
+# TODO: Do we have to state required fields or is the default an indicator
+# TODO: Take a look at the `format` specifier
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: mariadbs.mariadb.hostadelic.com
+spec:
+  group: mariadb.hostadelic.com
+  names:
+    kind: Mariadb
+    listKind: MariadbList
+    plural: mariadbs
+    singular: mariadb
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    additionalPrinterColumns:
+    - name: Architecture
+      description: Deployment architecture of MariaDB instance
+      type: string
+      jsonPath: .spec.architecture
+    - name: Volume size
+      description: Size of the data volume(s)
+      type: string
+      jsonPath: .spec.volumeSize
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:
+        description: Mariadb defines a MariaDB server(s) deployment.
+        type: object
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this
+              representation of an object. Servers should convert recognized
+              schemas to the latest internal value, and may reject unrecognized
+              values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource
+              this object represents. Servers may infer this from the endpoint
+              the client submits requests to. Cannot be updated. In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: 'Specifications of the desired state and behavior of
+              the MariaDB instance deployment.'
+            type: object
+            properties:
+              storageClass:
+                description: 'Which StorageClass to use to allocate
+                  PersistentVolume (default class if non precised)'
+                type: string
+                example: longhorn
+              accessModes:
+                description: 'Access modes of the PersistentVolume'
+                type: array
+                items:
+                  type: string
+                  enum: [ReadOnlyMany, ReadWriteOnce, ReadWriteMany]
+                example: [ReadWriteOnce]
+                default: [ReadWriteOnce]
+              volumeSize:
+                description: 'Size of the PersistentVolume to request'
+                type: string
+                example: 30Gi
+                default: 10Gi
+              image:
+                description: 'Specifiers of the image to use for the servers'
+                type: object
+                properties:
+                  repository:
+                    description: 'Repository of the image'
+                    type: string
+                    example: bitnami/mariadb
+                    default: bitnami/mariadb
+                  tag:
+                    description: 'Tag of the image'
+                    type: string
+                    example: 10.5.9-debian-10-r65
+                    default: latest
+              architecture:
+                description: 'Deployment architecture'
+                type: string
+                enum: [standalone, replication]
+                example: standalone
+                default: standalone
+              secretName:
+                description: 'Name of the secret to use and maintain for root
+                  user (default <name>-rootpw)'
+                type: string
+                example: sample-rootpw
+            #required: []
+          status:
+            description: Status defines the observed state of Mariadb
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+    served: true
+    storage: true
+    subresources:
+      status: {}
